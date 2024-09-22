@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="rectangle-box1">
+            <h1 class="admin-title">Admin Panel</h1>
+            <a href="/" class="wallet-button">Return to Game</a>
+        </header>
+
+        <!-- Manage Admin Access Section -->
+        <section class="section-container">
+            <h2 class="section-title">Manage Admin Access</h2>
+            <div class="admin-table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Telegram User ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Balance</th>
+                            <th>Admin Access</th>
+                            <th>Banned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            {% if user.telegram_id %}
+                                <tr>
+                                    <td data-label="Telegram User ID">{{ user.telegram_id }}</td>
+                                    <td data-label="Name">{{ user.name }}</td>
+                                    <td data-label="Email">{{ user.email }}</td>
+                                    <td data-label="Balance">{{ user.balance }}</td>
+                                    <td data-label="Admin Access">{{ 'Yes' if user.is_admin else 'No' }}</td>
+                                    <td data-label="Banned">{{ 'Yes' if user.is_banned else 'No' }}</td>
+                                    <td data-label="Actions">
+                                        {% if user.is_admin %}
+                                            <form action="{{ url_for('revoke_admin', telegram_id=user.telegram_id) }}" method="post" class="inline-form">
+                                                <button type="submit" class="btn revoke-btn">Revoke Admin</button>
+                                            </form>
+                                        {% else %}
+                                            <form action="{{ url_for('grant_admin', telegram_id=user.telegram_id) }}" method="post" class="inline-form">
+                                                <button type="submit" class="btn">Grant Admin</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if user.is_banned %}
+                                            <form action="{{ url_for('unban_user', telegram_id=user.telegram_id) }}" method="post" class="inline-form">
+                                                <button type="submit" class="btn unban-btn">Unban</button>
+                                            </form>
+                                        {% else %}
+                                            <form action="{{ url_for('ban_user', telegram_id=user.telegram_id) }}" method="post" class="inline-form">
+                                                <button type="submit" class="btn ban-btn">Ban</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">User with invalid Telegram ID</td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Last Game Logs Section -->
+        <section class="section-container">
+            <h2 class="section-title">Last Game Logs</h2>
+            <div class="admin-table-container">
+                <table class="admin-table" id="game-logs-table">
+                    <thead>
+                        <tr>
+                            <th>Telegram User ID</th>
+                            <th>Bet Amount</th>
+                            <th>Crash Point</th>
+                            <th>Winnings</th>
+                            <th>Result</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Game logs will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Deposit Logs Section -->
+        <section class="section-container">
+            <h2 class="section-title">Deposit Logs</h2>
+            <div class="admin-table-container">
+                <table class="admin-table" id="deposit-logs-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Amount (USD)</th>
+                            <th>Payment Status</th>
+                            <th>Pay Address</th>
+                            <th>Created At</th>
+                            <th>Confirmed At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamic rows will be added here via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Withdrawal Logs Section -->
+        <section class="section-container">
+            <h2 class="section-title">Withdrawal Logs</h2>
+            <div class="admin-table-container">
+                <table class="admin-table" id="withdrawal-logs-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Amount</th>
+                            <th>Address</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Completed At</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer>
+            <p>&copy; 2023 Your Game. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Function to handle admin actions like granting, revoking, banning, and unbanning users
+        async function handleUserAction(button, actionType) {
+            const form = button.closest("form");
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                });
+                if (response.ok) {
+                    alert(`${actionType} successfully.`);
+                    location.reload();  // Reload the page to reflect the changes
+                } else {
+                    alert(`Failed to ${actionType.toLowerCase()}.`);
+                }
+            } catch (error) {
+                console.error(`Error during ${actionType.toLowerCase()}:`, error);
+                alert(`An error occurred while trying to ${actionType.toLowerCase()}.`);
+            }
+        }
+    
+        // Assigning event listeners to grant and revoke admin buttons
+        const grantAdminButtons = document.querySelectorAll(".btn:not(.revoke-btn, .ban-btn, .unban-btn)");
+        const revokeAdminButtons = document.querySelectorAll(".revoke-btn");
+    
+        grantAdminButtons.forEach(button => {
+            button.addEventListener("click", async function(event) {
+                event.preventDefault();
+                await handleUserAction(button, "Grant Admin Access");
+            });
+        });
+    
+        revokeAdminButtons.forEach(button => {
+            button.addEventListener("click", async function(event) {
+                event.preventDefault();
+                await handleUserAction(button, "Revoke Admin Access");
+            });
+        });
+    
+        // Assigning event listeners to ban and unban buttons
+        const banButtons = document.querySelectorAll(".ban-btn");
+        const unbanButtons = document.querySelectorAll(".unban-btn");
+    
+        banButtons.forEach(button => {
+            button.addEventListener("click", async function(event) {
+                event.preventDefault();
+                await handleUserAction(button, "Ban User");
+            });
+        });
+    
+        unbanButtons.forEach(button => {
+            button.addEventListener("click", async function(event) {
+                event.preventDefault();
+                await handleUserAction(button, "Unban User");
+            });
+        });
+    
+        // Function to fetch the last game logs and update the admin panel
+        async function fetchLastGameLogs() {
+            try {
+                const response = await fetch('/last_game_logs');
+                if (response.ok) {
+                    const logs = await response.json();
+                    updateAdminPanelLogs(logs);
+                } else {
+                    console.error('Failed to fetch last game logs');
+                }
+            } catch (error) {
+                console.error('Error fetching last game logs:', error);
+            }
+        }
+    
+        // Function to update the admin panel with fetched game logs
+        function updateAdminPanelLogs(logs) {
+            const tableBody = document.querySelector("#game-logs-table tbody");
+            tableBody.innerHTML = "";  // Clear existing logs
+        
+            logs.forEach(log => {
+                const row = document.createElement("tr");
+        
+                row.innerHTML = `
+                    <td>${log.telegram_id}</td>
+                    <td>${log.bet_amount !== null ? log.bet_amount.toFixed(2) : 'Unknown'}</td>
+                    <td>${log.crash_point !== null ? log.crash_point.toFixed(2) : 'Unknown'}</td>
+                    <td>${log.winnings !== null ? log.winnings.toFixed(2) : 'Unknown'}</td>
+                    <td>${log.result}</td>
+                    <td>${log.timestamp}</td>
+                `;
+        
+                tableBody.appendChild(row);
+            });
+        }
+    
+        // Function to fetch user balances and update the admin panel
+        async function fetchUserBalances() {
+            try {
+                const response = await fetch('/user_balances');
+                if (response.ok) {
+                    const balances = await response.json();
+                    updateAdminPanelBalances(balances);
+                } else {
+                    console.error('Failed to fetch user balances');
+                }
+            } catch (error) {
+                console.error('Error fetching user balances:', error);
+            }
+        }
+    
+        // Function to update the admin panel with fetched user balances
+        function updateAdminPanelBalances(balances) {
+            const balanceCells = document.querySelectorAll("td[data-label='Balance']");
+            balanceCells.forEach((cell) => {
+                const telegramId = cell.closest("tr").querySelector("td[data-label='Telegram User ID']").textContent;
+                const userBalance = balances.find(balance => balance.telegram_id === telegramId);
+                cell.textContent = userBalance ? `$${userBalance.balance.toFixed(2)}` : "$0.00";
+            });
+        }
+    
+        // Function to fetch deposit logs and update the admin panel
+        async function fetchDepositLogs() {
+            try {
+                const response = await fetch('/admin/deposit_logs');
+                const depositLogs = await response.json();
+    
+                const logsTable = document.querySelector('#deposit-logs-table tbody');
+                logsTable.innerHTML = '';
+    
+                depositLogs.forEach(log => {
+                    const row = `
+                        <tr>
+                            <td>${log.user_id}</td>
+                            <td>${log.amount}</td>
+                            <td>${log.payment_status}</td>
+                            <td>${log.pay_address}</td>
+                            <td>${log.created_at}</td>
+                            <td>${log.confirmed_at || 'Pending'}</td>
+                        </tr>
+                    `;
+                    logsTable.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error('Failed to fetch deposit logs:', error);
+            }
+        }
+    
+        // Function to fetch withdrawal logs and update the admin panel
+        async function fetchWithdrawalLogs() {
+            try {
+                const response = await fetch('/admin/withdrawal_logs');
+                if (response.ok) {
+                    const logs = await response.json();
+                    updateWithdrawalLogs(logs);
+                } else {
+                    console.error('Failed to fetch withdrawal logs');
+                }
+            } catch (error) {
+                console.error('Error fetching withdrawal logs:', error);
+            }
+        }
+    
+        function updateWithdrawalLogs(logs) {
+            const tableBody = document.querySelector("#withdrawal-logs-table tbody");
+            tableBody.innerHTML = "";  // Clear existing logs
+    
+            logs.forEach(log => {
+                const row = document.createElement("tr");
+    
+                row.innerHTML = `
+                    <td>${log.user_id}</td>
+                    <td>${log.amount.toFixed(2)}</td>
+                    <td>${log.address}</td>
+                    <td>${log.status}</td>
+                    <td>${log.created_at}</td>
+                    <td>${log.completed_at || 'Pending'}</td>
+                    <td>
+                        <form method="post" action="/admin/update_withdrawal_status">
+                            <input type="hidden" name="log_id" value="${log.id}">
+                            <select name="status" onchange="this.form.submit()">
+                                <option value="Pending" ${log.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Completed" ${log.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            </select>
+                        </form>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+    
+        // Fetch and update withdrawal logs when the page loads
+       
+        // Function to update the status of a withdrawal log
+        async function updateWithdrawalStatus(selectElement) {
+            const logId = selectElement.getAttribute('data-log-id');
+            const newStatus = selectElement.value;
+    
+            try {
+                const response = await fetch('/admin/update_withdrawal_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `log_id=${logId}&status=${newStatus}`
+                });
+    
+                const result = await response.json();
+                if (result.success) {
+                    alert('Withdrawal status updated successfully.');
+                    fetchWithdrawalLogs();
+                } else {
+                    alert('Failed to update withdrawal status.');
+                }
+            } catch (error) {
+                console.error('Failed to update withdrawal status:', error);
+            }
+        }
+    
+        // Fetch initial data on page load
+        fetchUserBalances();
+        fetchLastGameLogs();
+        fetchDepositLogs();
+        fetchWithdrawalLogs();  // Fetch withdrawal logs
+    
+        // Set intervals to fetch data every 5 seconds
+        setInterval(fetchLastGameLogs, 5000);
+        setInterval(fetchUserBalances, 5000);
+        setInterval(fetchDepositLogs, 5000);
+        setInterval(fetchWithdrawalLogs, 5000);
+    });
+    
+</script>

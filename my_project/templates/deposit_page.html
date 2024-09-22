@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/deposit_page.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="deposit-container">
+        <h2>Deposit USDT TRC20</h2>
+        <h1>Minimum deposit 5 USD</h1>
+        <form id="depositForm" method="POST">
+            <label for="deposit-amount">Amount in USD:</label>
+            <input type="number" id="deposit-amount" name="amount" step="0.01" min="0" required>
+            <button type="submit" class="submit-deposit">Proceed with Deposit</button>
+        </form>
+
+        <div id="cancel-deposit-container">
+            <button id="cancelDepositButton" class="cancel-button">Cancel Deposit</button>
+        </div>
+
+        {% if payment_status == 'waiting' %}
+        <div class="payment-info">
+            <p>Send <strong>{{ pay_amount }}</strong> USDT to the following address:</p>
+            <p><strong class="pay-address">{{ pay_address }}</strong></p> <!-- Add a class to the address element -->
+            <button class="copy-button">Copy Address</button>
+            {% if qr_code_url %}
+            <img src="{{ qr_code_url }}" alt="QR Code" class="qr-code">
+            {% endif %}
+            <p id="timeRemaining"></p>
+            <p id="timeLimitMessage"><em>Please complete the transaction within the time limit provided.</em></p>
+        </div>
+        {% else %}
+        <p class="error-message">{{ error }}</p>
+        {% endif %}
+
+    </div>
+
+</body>
+</html>
+
+<script>
+    document.getElementById('depositForm').addEventListener('submit', async function(event) {
+        event.preventDefault();  // Prevent form from submitting the traditional way
+    
+        const amount = parseFloat(document.getElementById('deposit-amount').value);
+        const urlParams = new URLSearchParams(window.location.search);
+        const telegramId = urlParams.get('telegram_id');
+    
+        try {
+            const response = await fetch('/deposit_page', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'amount': amount,
+                    'telegram_id': telegramId  // Ensure the telegram_id is sent with the request
+                })
+            });
+    
+            if (response.ok) {
+                const htmlResponse = await response.text();
+                document.open();
+                document.write(htmlResponse);
+                document.close();
+    
+                const paymentInfo = document.querySelector(".payment-info");
+                if (paymentInfo) {
+                    setupCopyButton();
+                    startTimer();
+                }
+            } else {
+                const errorData = await response.json().catch(() => null);
+                document.querySelector('.error-message').textContent = (errorData && errorData.error) || "Failed to create payment. Please try again.";
+            }
+        } catch (error) {
+            document.querySelector('.error-message').textContent = "An error occurred. Please try again.";
+            console.error('Error:', error);
+        }
+    });
+    
+    // Function to set up the copy button
+    function copyToClipboard(text) {
+        const tempInput = document.createElement('input');
+        document.body.appendChild(tempInput);
+        tempInput.value = text;
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        alert('Address copied to clipboard!');
+    }
+    
+    function setupCopyButton() {
+        const copyButton = document.querySelector('.copy-button'); // Selector for the copy button
+        const payAddressElement = document.querySelector('.payment-info .pay-address'); // Assuming the address is in a span with class 'pay-address'
+        
+        if (copyButton && payAddressElement) {
+            const payAddress = payAddressElement.textContent.trim(); // Get the text content of the pay address
+            
+            copyButton.addEventListener('click', () => {
+                copyToClipboard(payAddress);
+            });
+        } else {
+            console.error('Copy button or pay address element not found.');
+        }
+    }
+    
+    document.addEventListener("DOMContentLoaded", setupCopyButton);
+    
+    // Function to handle the countdown timer
+    function startTimer() {
+        const timeLimitMessage = document.getElementById('timeLimitMessage');
+        const timeRemaining = document.getElementById('timeRemaining');
+        const expirationEstimateDate = new Date('{{ expiration_estimate_date | safe }}'); // Ensure this is properly formatted
+    
+        function updateTimer() {
+            const now = new Date().getTime();
+            const timeDiff = expirationEstimateDate - now;
+    
+            if (timeDiff > 0) {
+                const minutes = Math.floor(timeDiff / (1000 * 60));
+                const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+                timeRemaining.textContent = `Time remaining: ${minutes}m ${seconds}s`;
+            } else {
+                clearInterval(timerInterval); // Stop the timer
+                timeRemaining.textContent = 'Order has expired!';
+                timeLimitMessage.textContent = '';
+                document.querySelector(".submit-deposit").disabled = true; // Disable the button to prevent resubmission
+    
+                // Show the alert to notify the user that the order has expired
+                alert('This order has expired. Please try again.');
+            }
+        }
+    
+        // Update the timer immediately on page load
+        updateTimer();
+        
+        // Set the timer to update every second
+        const timerInterval = setInterval(updateTimer, 1000); 
+    }
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        setupCopyButton();
+        startTimer();
+    });
+    document.getElementById('cancelDepositButton').addEventListener('click', async function() {
+        try {
+            const response = await fetch('/cancel_deposit', {
+                method: 'POST',
+            });
+
+            if (response.ok) {
+                alert("Deposit has been cancelled.");
+                // Optionally, redirect to another page or update the UI accordingly
+                window.location.href = '/';
+            } else {
+                alert("Failed to cancel the deposit.");
+            }
+        } catch (error) {
+            console.error('Error cancelling deposit:', error);
+        }
+    });
+    
+    
+    
+</script>

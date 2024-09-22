@@ -1,0 +1,126 @@
+body {
+    background-color: #121212;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.deposit-container {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #1e1e1e;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.deposit-container h2 {
+    text-align: center;
+    color: #ffffff;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.deposit-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.deposit-container input[type="number"] {
+    padding: 10px;
+    border: 1px solid #333;
+    background-color: #2e2e2e;
+    color: #ffffff;
+    border-radius: 5px;
+}
+
+.deposit-container input[type="number"]::placeholder {
+    color: #888;
+}
+
+.submit-deposit {
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.submit-deposit:hover {
+    background-color: #45a049;
+}
+
+.payment-info {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.payment-info p {
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #d3d3d3;
+}
+
+.qr-code {
+    margin: 20px auto;
+    width: 200px;
+    height: 200px;
+    border: 2px solid #333;
+    border-radius: 5px;
+}
+
+.copy-button {
+    margin-top: 10px;
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.copy-button:hover {
+    background-color: #0056b3;
+}
+
+.error-message {
+    color: #ff4d4d;
+    text-align: center;
+    margin-top: 20px;
+    font-weight: bold;
+}
+.cancel-button {
+    background-color: #c90303; /* Red color for the cancel button */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 20px;
+    display: inline-block;
+}
+
+.cancel-button:hover {
+    background-color: #e33e3e; /* Darker red on hover */
+}
+
+.cancel-button:active {
+    background-color: #c63535; /* Even darker red on click */
+}
+
+.cancel-button:focus {
+    outline: none;
+    box-shadow: 0 0 5px rgba(255, 76, 76, 0.7); /* Add a shadow on focus */
+}

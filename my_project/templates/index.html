@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Mini Webpage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="rectangle-box1">
+        <button class="wallet-button">Wallet</button>
+        <div class="wallet-popup">
+            <button class="wallet-option deposit-button">Deposit</button>
+            <button class="wallet-option withdraw-button">Withdrawal</button>
+            <button class="wallet-option deposit-history-button">Deposit History</button>
+            <button class="wallet-option withdrawal-history-button">Withdrawal History</button>
+        </div>
+    </div>
+
+    <div class="rectangle-box2">
+        <p>Crash</p>
+    </div>
+
+    <div class="crash-game-box">
+        <div class="graph">
+            <div class="vertical-numbers">
+                <div>10x</div>
+                <div>8x</div>
+                <div>6x</div>
+                <div>4x</div>
+                <div>2x</div>
+            </div>
+            <div class="horizontal-numbers">
+                <div>0</div>
+                <div>2</div>
+                <div>4</div>
+                <div>6</div>
+                <div>8</div>
+                <div>10</div>
+            </div>
+            <div class="horizontal-line"></div>
+            <div class="vertical-line"></div>
+            <div class="graph-text" id="multiplier">1.00x</div>
+            <canvas id="graphCanvas" width="600" height="230"></canvas>
+            <div class="rocket" id="rocket"></div>
+        </div>
+    </div>
+
+    <div class="rectangle-box3">
+        <p>CASHOUT AT</p>
+        <div style="display: flex; align-items: center;">
+            <button class="mini-button" onclick="decrement()">-</button>
+            <p class="number-display" id="numberDisplay">10.00</p>
+            <button class="mini-button" onclick="increment()">+</button>
+        </div>
+    </div>
+    
+    <div class="audio-toggle">
+        <img src="{{ url_for('static', filename='images/audio_on.png') }}" id="audioIcon" alt="Audio Icon">
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: flex-start; width: 100%;">
+        <div class="rectangle-box4">
+            <div class="mini-buttons left">
+                <button class="mini-button" onclick="setMin()">Min</button>
+                <button class="mini-button" onclick="setMax()">Max</button>
+            </div>
+            <p id="amount">$1.00</p>
+            <div class="mini-buttons right">
+                <button class="mini-button" onclick="divideByTwo()">1/2</button>
+                <button class="mini-button" onclick="multiplyByTwo()">2x</button>
+            </div>
+        </div>
+        <button class="bet-button"><span>Bet</span></button>
+    </div>
+
+    <div class="game-history-container">
+        <h3>Game History</h3>
+        <div id="game-history-box" class="game-history-box"></div>
+    </div>
+
+    <div id="depositModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Deposit USDT</h2>
+            <form id="depositForm">
+                <label for="deposit-amount">Amount in USD:</label>
+                <input type="number" id="deposit-amount" name="amount" step="0.01" min="0" required>
+                <button type="submit" class="submit-deposit">Proceed with Deposit</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="withdrawModal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('withdrawModal')">&times;</span>
+            <h2>Withdraw USDT TRC20</h2>
+            <label for="withdraw-amount">Enter Withdrawal Amount:</label>
+            <input type="text" id="withdraw-amount" placeholder="Amount">
+            <label for="wallet-address-input">Input Wallet Address:</label>
+            <input type="text" id="wallet-address-input" placeholder="Wallet Address">
+            <button class="submit-withdraw">Withdraw</button>
+        </div>
+    </div>
+
+    <div id="depositHistoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Deposit History</h2>
+            <div id="deposit-history-box" class="history-box"></div>
+        </div>
+    </div>
+
+    <div id="withdrawalHistoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Withdrawal History</h2>
+            <div id="withdrawal-history-box" class="history-box"></div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        <span class="notification-icon">&#10003;</span> 
+        <span class="notification-text">Deposit pending...</span>
+    </div>
+
+    <audio id="click-sound" src="{{ url_for('static', filename='audio/button-pressed-38129.mp3') }}" preload="auto"></audio>
+    <audio id="rocket-sound" src="{{ url_for('static', filename='audio/rocket-sound.mp3') }}" preload="auto"></audio>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const telegramId = urlParams.get('telegram_id');
+        
+            let currentBalance = 0.0;
+            let betAmount = 1.00;
+            let cashoutMultiplier = 10.00;
+            let gameInterval;
+            let gameInProgress = false;
+            let hasCashedOut = false;
+            let crashPoint = 1.00;
+            let soundEnabled = true;
+        
+            const multiplierText = document.getElementById("multiplier");
+            const graphCanvas = document.getElementById("graphCanvas");
+            const graphCtx = graphCanvas.getContext("2d");
+            const rocket = document.getElementById("rocket");
+            const betButton = document.querySelector(".bet-button");
+            const clickSound = document.getElementById("click-sound");
+            const rocketSound = document.getElementById("rocket-sound");
+            const audioIcon = document.getElementById("audioIcon");
+            const gameHistoryBox = document.getElementById("game-history-box");
+            const walletButton = document.querySelector(".wallet-button");
+            const walletPopup = document.querySelector(".wallet-popup");
+            const depositButton = document.querySelector(".deposit-button");
+            const withdrawButton = document.querySelector(".withdraw-button");
+            const depositHistoryButton = document.querySelector(".deposit-history-button");
+            const withdrawalHistoryButton = document.querySelector(".withdrawal-history-button");
+            const depositHistoryModal = document.getElementById("depositHistoryModal");
+            const withdrawalHistoryModal = document.getElementById("withdrawalHistoryModal");
+            const depositHistoryBox = document.getElementById("deposit-history-box");
+            const withdrawalHistoryBox = document.getElementById("withdrawal-history-box");
+            const withdrawModal = document.getElementById("withdrawModal");
+            const closeButtons = document.querySelectorAll(".close-button");
+            const withdrawSubmitButton = document.querySelector(".submit-withdraw");
+            const withdrawAmountInput = document.getElementById("withdraw-amount");
+            const withdrawAddressInput = document.getElementById("wallet-address-input");
+            const numberDisplay = document.getElementById("numberDisplay");
+        
+            rocket.style.display = "none";
+        
+            // Update balance display
+            function createOrUpdateBalanceDisplay() {
+                let balanceDisplay = document.getElementById("dynamic-balance-display");
+        
+                if (!balanceDisplay) {
+                    balanceDisplay = document.createElement("div");
+                    balanceDisplay.id = "dynamic-balance-display";
+                    balanceDisplay.style.display = "flex";
+                    balanceDisplay.style.alignItems = "center";
+                    balanceDisplay.style.color = "white";
+                    balanceDisplay.style.fontSize = "18px";
+                    balanceDisplay.style.marginBottom = "10px";
+        
+                    const rectangleBox1 = document.querySelector(".rectangle-box1");
+                    rectangleBox1.insertBefore(balanceDisplay, rectangleBox1.firstChild);
+        
+                    const usdtIcon = document.createElement("img");
+                    usdtIcon.src = "/static/images/usdt_icon.png";
+                    usdtIcon.alt = "USDT Icon";
+                    usdtIcon.style.width = "15px";
+                    usdtIcon.style.height = "15px";
+                    usdtIcon.style.marginRight = "5px";
+        
+                    balanceDisplay.appendChild(usdtIcon);
+                }
+        
+                const storedBalance = parseFloat(localStorage.getItem('currentBalance'));
+                balanceDisplay.textContent = `Balance: $${storedBalance.toFixed(2)}`;
+            }
+        
+            // Fetch user balance from the server
+            async function fetchBalance(telegramId) {
+                try {
+                    const response = await fetch(`/balance/${telegramId}`);
+                    const data = await response.json();
+                    if (response.ok && data.balance !== undefined) {
+                        currentBalance = parseFloat(data.balance);
+                        localStorage.setItem('currentBalance', currentBalance.toFixed(2));
+                        createOrUpdateBalanceDisplay();
+                    } else {
+                        console.error('Failed to fetch balance:', data.error);
+                    }
+                } catch (error) {
+                    console.error('Error fetching balance:', error);
+                }
+            }
+        
+            // Update balance and sync with the server
+            async function handleBalanceChange(newBalance) {
+                if (!telegramId) {
+                    console.error('Cannot update balance because telegram_id is null.');
+                    return;
+                }
+        
+                const payload = {
+                    telegram_id: telegramId,
+                    balance: newBalance
+                };
+                await updateBalanceOnServer(payload);
+                fetchBalance(telegramId);
+            }
+        
+            async function updateBalanceOnServer(payload) {
+                try {
+                    const response = await fetch('/update_balance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+        
+                    const data = await response.json();
+                    if (!response.ok) {
+                        console.error('Failed to update balance:', data.error);
+                    }
+                } catch (error) {
+                    console.error('Error updating balance:', error);
+                }
+            }
+        
+            // Handle game history and logging
+            function updateGameHistory(betAmount, winnings, crashPoint, result, cashoutMultiplierUsed) {
+                const logs = JSON.parse(localStorage.getItem('gameLogs')) || [];
+                const newLog = {
+                    bet_amount: betAmount,
+                    winnings: winnings,
+                    crash_point: crashPoint,
+                    result: result,
+                    timestamp: new Date().toLocaleString(),
+                    cashout_multiplier: cashoutMultiplierUsed || null  // Add cashout multiplier to history
+                };
+                logs.unshift(newLog);
+                localStorage.setItem('gameLogs', JSON.stringify(logs));
+                displayGameHistory(logs);
+            }
+        
+            function displayGameHistory(logs) {
+                gameHistoryBox.innerHTML = "";
+                logs.forEach((log, index) => {
+                    const gameItem = document.createElement("div");
+                    gameItem.className = "game-history-item";
+                    gameItem.innerHTML = `
+                        <h4>Game #${index + 1}</h4>
+                        <div class="history-detail">
+                            <span>Bet Amount:</span>
+                            <span>$${log.bet_amount.toFixed(2)}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Winnings:</span>
+                            <span>$${log.winnings.toFixed(2)}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Crash Point:</span>
+                            <span>${log.crash_point}x</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Cashout Multiplier:</span>
+                            <span>${log.cashout_multiplier ? log.cashout_multiplier.toFixed(2) + "x" : "N/A"}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Result:</span>
+                            <span class="${log.result === 'win' ? 'win' : 'loss'}">
+                                ${log.result.charAt(0).toUpperCase() + log.result.slice(1)}
+                            </span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Timestamp:</span>
+                            <span>${log.timestamp}</span>
+                        </div>
+                    `;
+                    gameHistoryBox.appendChild(gameItem);
+                });
+            }
+            function generateCrashPoint() {
+                const randomValue = Math.random();
+                
+                if (randomValue < 0.7) {
+                    
+                    return (Math.random() * (5.00 - 1.00) + 1.00).toFixed(2);
+                } else {
+                    
+                    return (Math.random() * (34.00 - 5.00) + 5.00).toFixed(2);
+                }
+            }
+            
+            crashPoint = generateCrashPoint();
+            
+        
+            // Handle the game start
+            async function startGame() {
+                if (gameInProgress) {
+                    showNotification("A game is already in progress.");
+                    return;
+                }
+        
+                if (currentBalance < betAmount) {
+                    showNotification("Insufficient balance");
+                    return;
+                }
+        
+                currentBalance -= betAmount;
+                await handleBalanceChange(currentBalance);
+        
+                gameInProgress = true;
+                hasCashedOut = false;
+                betButton.textContent = "Cashout";
+                disableBetButton(false);
+        
+                let currentMultiplier = 1.00;
+                multiplierText.textContent = `${currentMultiplier.toFixed(2)}x`;
+                graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+                rocket.style.display = "block";
+                rocket.style.bottom = "50%";
+                rocket.style.left = "50px";
+                clearInterval(gameInterval);
+        
+                crashPoint = generateCrashPoint();
+
+                
+
+        
+                const timingConfig = [
+                    { threshold: 0, time: 8000 },
+                    { threshold: 1, time: 8000 },
+                    { threshold: 2, time: 8000 },
+                    { threshold: 3, time: 7900 },
+                    { threshold: 4, time: 7800 },
+                    { threshold: 5, time: 7700 },
+                    { threshold: 6, time: 7600 },
+                    { threshold: 7, time: 7500 },
+                    { threshold: 8, time: 7400 },
+                    { threshold: 9, time: 7300 },
+                    { threshold: 10, time: 7200 },
+                    { threshold: 11, time: 7100 },
+                    { threshold: 12, time: 7000 },
+                    { threshold: 13, time: 6900 },
+                    { threshold: 14, time: 6800 },
+                    { threshold: 15, time: 6700 },
+                    { threshold: 16, time: 6600 },
+                    { threshold: 17, time: 6500 },
+                    { threshold: 18, time: 6400 },
+                    { threshold: 19, time: 6300 },
+                    { threshold: 20, time: 6200 },
+                    { threshold: 21, time: 6100 },
+                    { threshold: 22, time: 6000 },
+                    { threshold: 23, time: 5900 },
+                    { threshold: 24, time: 5800 },
+                    { threshold: 25, time: 5700 },
+                    { threshold: 26, time: 5600 },
+                    { threshold: 27, time: 5500 },
+                    { threshold: 28, time: 5400 },
+                    { threshold: 29, time: 5300 },
+                    { threshold: 30, time: 5200 },
+                    { threshold: 31, time: 5100 },
+                    { threshold: 32, time: 5000 },
+                    { threshold: 33, time: 4900 },
+                    { threshold: 34, time: 4800 }
+                ];
+        
+                let currentThresholdIndex = 0;
+        
+                gameInterval = setInterval(() => {
+                    if (currentMultiplier >= timingConfig[currentThresholdIndex].threshold) {
+                        if (currentThresholdIndex < timingConfig.length - 1) {
+                            currentThresholdIndex++;
+                        }
+                    }
+        
+                    currentMultiplier += (1 / (timingConfig[currentThresholdIndex].time / 200));
+                    multiplierText.textContent = `${currentMultiplier.toFixed(2)}x`;
+        
+                    const maxGraphWidth = graphCanvas.width - 60;
+                    const x = Math.min(50 + (currentMultiplier * (maxGraphWidth) / 20), maxGraphWidth);
+                    const y = graphCanvas.height - 50 - (currentMultiplier * (graphCanvas.height - 20) / 20);
+        
+                    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+        
+                    const gradient = graphCtx.createLinearGradient(0, graphCanvas.height - 50, 0, y);
+                    if (currentMultiplier >= crashPoint * 0.8) {
+                        gradient.addColorStop(0, 'rgba(255, 0, 0, 0.5)');
+                        gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                    } else {
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+                        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    }
+        
+                    graphCtx.beginPath();
+                    graphCtx.moveTo(50, graphCanvas.height - 50);
+                    graphCtx.lineTo(x, y);
+                    graphCtx.lineTo(x, graphCanvas.height - 50);
+                    graphCtx.closePath();
+                    graphCtx.fillStyle = gradient;
+                    graphCtx.fill();
+        
+                    graphCtx.beginPath();
+                    graphCtx.moveTo(50, graphCanvas.height - 50);
+                    graphCtx.lineTo(x, y);
+                    graphCtx.strokeStyle = 'white';
+                    graphCtx.lineWidth = 2;
+                    graphCtx.stroke();
+        
+                    rocket.style.left = `${x}px`;
+                    rocket.style.bottom = `${graphCanvas.height - y}px`;
+        
+                    if (!hasCashedOut && cashoutMultiplier > 0.00 && currentMultiplier >= cashoutMultiplier) {
+                        autoCashout(currentMultiplier);
+                    }
+        
+                    if (currentMultiplier >= crashPoint || x >= maxGraphWidth) {
+                        clearInterval(gameInterval);
+                        rocket.style.display = "none";
+                        showCrashEffect();
+                        if (!hasCashedOut) {
+                            logGame(betAmount, crashPoint, 0, 'lose', currentMultiplier, null);
+                        }
+                        betButton.textContent = "Bet";
+                        enableBetButton();
+                        gameInProgress = false;
+                    }
+                }, 200);
+        
+                playSound(rocketSound);
+            }
+        
+            function autoCashout(currentMultiplier) {
+                const winProbability = Math.random();
+                const isWin = winProbability > 0.5;
+        
+                hasCashedOut = true;
+        
+                let winnings = 0;
+                if (isWin) {
+                    winnings = betAmount * currentMultiplier;
+                    currentBalance += winnings;
+                    handleBalanceChange(currentBalance);
+                    showNotification(`Auto cashed out at ${currentMultiplier.toFixed(2)}x and won $${winnings.toFixed(2)}`);
+                    logGame(betAmount, crashPoint, winnings, 'win', currentMultiplier, cashoutMultiplier);
+                } else {
+                    showNotification(`Auto cashed out at ${currentMultiplier.toFixed(2)}x but lost`);
+                    logGame(betAmount, crashPoint, 0, 'lose', currentMultiplier, cashoutMultiplier);
+                }
+        
+                betButton.textContent = "Cashed Out";
+                disableBetButton();
+            }
+        
+            // Add a spark effect when the game crashes
+            function showCrashEffect() {
+                const sparkContainer = document.createElement("div");
+                sparkContainer.classList.add("spark-container");
+            
+                // Add a text element to display "Game Crashed!"
+                const crashText = document.createElement("div");
+                crashText.textContent = "Game Crashed!";
+                crashText.classList.add("crash-text");
+            
+                // Add an image element for the spark animation
+                const sparkImage = document.createElement("img");
+                sparkImage.src = "/static/images/spark.png"; // Your spark image path
+                sparkImage.alt = "Spark Animation";
+                sparkImage.classList.add("spark-image");
+            
+                // Append both the text and image to the spark container
+                sparkContainer.appendChild(crashText);
+                sparkContainer.appendChild(sparkImage);
+                document.body.appendChild(sparkContainer);
+            
+                
+                setTimeout(() => {
+                    document.body.removeChild(sparkContainer);
+                }, 4000);  
+            }
+            
+            
+            const style = document.createElement("style");
+            style.innerHTML = `
+                .spark-container {
+                    position: fixed; 
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                }
+            
+                .spark-image {
+                    width: 200px;
+                    height: 200px;
+                    animation: sparkAnimation 4.0s ease-out;
+                }
+            
+                .crash-text {
+                    font-size: 28px;
+                    color: red;
+                    font-weight: bold;
+                    margin-bottom: 20px;
+                    animation: crashTextAnimation 3.0s ease-out;
+                }
+            
+                @keyframes sparkAnimation {
+                    0% {
+                        opacity: 0;
+                        transform: scale(0.5);
+                    }
+                    50% {
+                        opacity: 1;
+                        transform: scale(1.2);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: scale(1.5);
+                    }
+                }
+            
+                @keyframes crashTextAnimation {
+                    0% {
+                        opacity: 0;
+                        transform: scale(0.8);
+                    }
+                    50% {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: scale(1.2);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+        
+            // Add click event listener to the bet button
+            betButton.addEventListener("click", async function () {
+                if (!gameInProgress) {
+                    startGame();  // Start a new game if none is in progress
+                } else if (!hasCashedOut) {
+                    const currentMultiplier = parseFloat(multiplierText.textContent);
+                    autoCashout(currentMultiplier);  // Cashout during the game
+                }
+            });
+        
+            async function logGame(betAmount, crashPoint, winnings, result, currentMultiplier, cashoutMultiplier) {
+                const payload = {
+                    telegram_id: telegramId,
+                    bet_amount: betAmount,
+                    crash_point: crashPoint,
+                    cashout_multiplier: cashoutMultiplier || null,
+                    current_multiplier: currentMultiplier,
+                    winnings: winnings,
+                    result: result
+                };
+        
+                try {
+                    const response = await fetch('/start_game', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+        
+                    const data = await response.json();
+                    if (data.success) {
+                        updateGameHistory(betAmount, winnings, crashPoint, result, cashoutMultiplier);
+                        currentBalance = data.new_balance;
+                        createOrUpdateBalanceDisplay();
+                    } else {
+                        console.error('Failed to log game:', data.error);
+                        showNotification(data.error);
+                    }
+                } catch (error) {
+                    console.error('Error logging game:', error);
+                    showNotification("An error occurred while logging the game.");
+                }
+            }
+        
+            function disableBetButton(disabled = true) {
+                betButton.disabled = disabled;
+                betButton.style.backgroundColor = disabled ? "#888" : "#4CA419";
+                betButton.style.cursor = disabled ? "not-allowed" : "pointer";
+            }
+        
+            function enableBetButton() {
+                disableBetButton(false);
+            }
+        
+            function playSound(audioElement) {
+                if (soundEnabled) {
+                    audioElement.play();
+                }
+            }
+        
+            function showNotification(message) {
+                const notification = document.getElementById("notification");
+                const notificationText = notification.querySelector(".notification-text");
+                notificationText.textContent = message;
+                notification.style.display = "block";
+                setTimeout(() => {
+                    notification.style.display = "none";
+                }, 3000);
+            }
+        
+            // Wallet functionality
+            walletButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                const isPopupVisible = walletPopup.style.display === "block";
+                walletPopup.style.display = isPopupVisible ? "none" : "block";
+                playSound(clickSound);
+            });
+        
+            depositButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                window.location.href = `/deposit_page`;
+                playSound(clickSound);
+            });
+        
+            withdrawButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                withdrawModal.style.display = "block";
+                walletPopup.style.display = "none";
+                playSound(clickSound);
+            });
+        
+            depositHistoryButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                fetchDepositHistory();
+                depositHistoryModal.style.display = "block";
+                playSound(clickSound);
+            });
+        
+            withdrawalHistoryButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                fetchUserWithdrawalLogs();
+                withdrawalHistoryModal.style.display = "block";
+                playSound(clickSound);
+            });
+        
+            closeButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    withdrawModal.style.display = "none";
+                    depositHistoryModal.style.display = "none";
+                    withdrawalHistoryModal.style.display = "none";
+                    playSound(clickSound);
+                });
+            });
+        
+            window.addEventListener("click", (event) => {
+                if (event.target === withdrawModal || event.target === depositHistoryModal || event.target === withdrawalHistoryModal) {
+                    withdrawModal.style.display = "none";
+                    depositHistoryModal.style.display = "none";
+                    withdrawalHistoryModal.style.display = "none";
+                }
+            });
+        
+            withdrawSubmitButton.addEventListener("click", async () => {
+                const amount = parseFloat(withdrawAmountInput.value);
+                const address = withdrawAddressInput.value.trim();
+        
+                if (!amount || !address) {
+                    showNotification("Please fill in all fields");
+                    playSound(clickSound);
+                    return;
+                }
+        
+                if (currentBalance >= amount) {
+                    try {
+                        const response = await fetch('/withdraw', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: `telegram_id=${telegramId}&amount=${amount}&address=${address}`
+                        });
+        
+                        const data = await response.json();
+        
+                        if (data.success) {
+                            const withdrawalLog = {
+                                amount: amount,
+                                address: address,
+                                status: "Pending",
+                                created_at: new Date().toLocaleString(),
+                                completed_at: null
+                            };
+        
+                            saveWithdrawalLog(withdrawalLog);
+        
+                            currentBalance -= amount;
+                            await handleBalanceChange(currentBalance);
+                            showNotification("Withdrawal successful");
+                            playSound(clickSound);
+        
+                            fetchUserWithdrawalLogs();
+        
+                        } else {
+                            showNotification(data.error || "Failed to process withdrawal.");
+                            playSound(clickSound);
+                        }
+                    } catch (error) {
+                        console.error('Error submitting withdrawal:', error);
+                        showNotification("An error occurred while processing the withdrawal.");
+                        playSound(clickSound);
+                    }
+                } else {
+                    showNotification("Insufficient balance");
+                    playSound(clickSound);
+                }
+            });
+        
+            if (telegramId) {
+                fetchBalance(telegramId);
+            } else {
+                showNotification('Telegram ID not found. Please ensure the URL is correct.');
+                console.error('Telegram ID not found in the URL.');
+            }
+        
+            if (localStorage.getItem('currentBalance')) {
+                const storedBalance = localStorage.getItem('currentBalance');
+                currentBalance = parseFloat(storedBalance) || 0.00;
+                createOrUpdateBalanceDisplay();
+            }
+        
+            if (localStorage.getItem('gameLogs')) {
+                const logs = JSON.parse(localStorage.getItem('gameLogs'));
+                displayGameHistory(logs);
+            }
+        
+            if (localStorage.getItem('withdrawalLogs')) {
+                const logs = JSON.parse(localStorage.getItem('withdrawalLogs'));
+                displayWithdrawalHistory(logs);
+            }
+        
+            function updateDisplay() {
+                numberDisplay.textContent = cashoutMultiplier.toFixed(2);
+            }
+        
+            window.decrement = function () {
+                if (cashoutMultiplier > 0.00) {
+                    cashoutMultiplier -= 0.01;
+                    cashoutMultiplier = Math.max(cashoutMultiplier, 0.00);
+                    updateDisplay();
+                }
+            };
+        
+            window.increment = function () {
+                if (cashoutMultiplier < 20.00) {
+                    cashoutMultiplier += 0.01;
+                    cashoutMultiplier = Math.min(cashoutMultiplier, 20.00);
+                    updateDisplay();
+                }
+            };
+        
+            function setMin() {
+                betAmount = 1.00;
+                document.getElementById("amount").textContent = `$${betAmount.toFixed(2)}`;
+            }
+        
+            function setMax() {
+                betAmount = 500.00;
+                document.getElementById("amount").textContent = `$${betAmount.toFixed(2)}`;
+            }
+        
+            function divideByTwo() {
+                betAmount = Math.max(betAmount / 2, 10.00);
+                document.getElementById("amount").textContent = `$${betAmount.toFixed(2)}`;
+            }
+        
+            function multiplyByTwo() {
+                betAmount = Math.min(betAmount * 2, 500.00);
+                document.getElementById("amount").textContent = `$${betAmount.toFixed(2)}`;
+            }
+        
+            document.querySelector(".mini-buttons.left .mini-button:nth-child(1)").addEventListener("click", setMin);
+            document.querySelector(".mini-buttons.left .mini-button:nth-child(2)").addEventListener("click", setMax);
+            document.querySelector(".mini-buttons.right .mini-button:nth-child(1)").addEventListener("click", divideByTwo);
+            document.querySelector(".mini-buttons.right .mini-button:nth-child(2)").addEventListener("click", multiplyByTwo);
+        
+            document.querySelector('.deposit-history-button').addEventListener('click', () => {
+                fetchDepositLogs();
+                document.getElementById('depositHistoryModal').style.display = 'block';
+            });
+        
+            document.querySelector('.withdrawal-history-button').addEventListener('click', () => {
+                fetchWithdrawalLogs();
+                document.getElementById('withdrawalHistoryModal').style.display = 'block';
+            });
+        
+            audioIcon.addEventListener("click", () => {
+                soundEnabled = !soundEnabled;
+                audioIcon.src = soundEnabled ? "/static/images/audio_on.png" : "/static/images/audio_off.png";
+            });
+        
+            function saveDepositLog(log) {
+                const depositLogs = JSON.parse(localStorage.getItem('depositLogs')) || [];
+                depositLogs.unshift(log);
+                localStorage.setItem('depositLogs', JSON.stringify(depositLogs));
+            }
+        
+            function saveWithdrawalLog(log) {
+                const withdrawalLogs = JSON.parse(localStorage.getItem('withdrawalLogs')) || [];
+                withdrawalLogs.unshift(log);
+                localStorage.setItem('withdrawalLogs', JSON.stringify(withdrawalLogs));
+                displayWithdrawalHistory(withdrawalLogs);
+            }
+        
+            async function fetchDepositLogs() {
+                try {
+                    const response = await fetch('/admin/deposit_logs');
+                    const depositLogs = await response.json();
+        
+                    const depositHistoryBox = document.getElementById('deposit-history-box');
+                    depositHistoryBox.innerHTML = '';
+        
+                    depositLogs.forEach(log => {
+                        const logItem = document.createElement('div');
+                        logItem.className = 'history-item';
+                        logItem.innerHTML = `
+                            <p>Amount: $${log.amount}</p>
+                            <p>Status: ${log.payment_status}</p>
+                            <p>Address: ${log.pay_address}</p>
+                            <p>Created At: ${log.created_at}</p>
+                            <p>Confirmed At: ${log.confirmed_at || 'Pending'}</p>
+                        `;
+                        depositHistoryBox.appendChild(logItem);
+                    });
+                } catch (error) {
+                    console.error('Error fetching deposit logs:', error);
+                }
+            }
+        
+            async function fetchWithdrawalLogs() {
+                try {
+                    const response = await fetch('/admin/withdrawal_logs');
+                    if (response.ok) {
+                        const logs = await response.json();
+                        displayWithdrawalHistory(logs);
+                    } else {
+                        console.error('Failed to fetch withdrawal logs');
+                    }
+                } catch (error) {
+                    console.error('Error fetching withdrawal logs:', error);
+                }
+            }
+        
+            async function fetchDepositHistory() {
+                try {
+                    const response = await fetch('/admin/deposit_logs');
+                    if (response.ok) {
+                        const logs = await response.json();
+                        displayDepositHistory(logs);
+                    } else {
+                        console.error('Failed to fetch deposit logs');
+                    }
+                } catch (error) {
+                    console.error('Error fetching deposit logs:', error);
+                }
+            }
+        
+            async function fetchUserWithdrawalLogs() {
+                try {
+                    const response = await fetch('/user/withdrawal_logs');
+                    if (response.ok) {
+                        const logs = await response.json();
+                        displayWithdrawalHistory(logs);
+                    } else {
+                        console.error('Failed to fetch withdrawal logs');
+                    }
+                } catch (error) {
+                    console.error('Error fetching withdrawal logs:', error);
+                }
+            }
+        
+            function displayWithdrawalHistory(logs) {
+                withdrawalHistoryBox.innerHTML = "";
+        
+                logs.forEach((log, index) => {
+                    const historyItem = document.createElement("div");
+                    historyItem.className = "history-item";
+                    historyItem.innerHTML = `
+                        <h4>Withdrawal #${index + 1}</h4>
+                        <div class="history-detail">
+                            <span>Amount:</span>
+                            <span>$${log.amount.toFixed(2)}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Address:</span>
+                            <span>${log.address}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Status:</span>
+                            <span>${log.status}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Created At:</span>
+                            <span>${log.created_at}</span>
+                        </div>
+                        <div class="history-detail">
+                            <span>Completed At:</span>
+                            <span>${log.completed_at ? log.completed_at : 'Pending'}</span>
+                        </div>
+                    `;
+                    withdrawalHistoryBox.appendChild(historyItem);
+                });
+            }
+        });
+        
+        // Add this CSS for the spark animation effect
+        
+        
+        
+        
+        
+    </script>
+</body>
+</html>
